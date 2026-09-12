@@ -42,3 +42,19 @@ export type Card = ColoredCard | WildCard;
 export type Type = Card["type"];
 
 export type TypedCard<T extends Type> = Extract<Card, { type: T }>;
+
+// Helper functions for identifying cards 
+export function isSameCard(card1: Card, card2: Card): boolean{
+  if(card1.type !== card2.type){
+    return false;
+  }
+  if("color" in card1 && "color" in card2){
+    if(card1.color !== card2.color){
+      return false;
+    }
+    if(card1.type === "number" && card2.type === "number"){
+      return card1.value === card2.value;
+    }
+  }
+  return true;
+}

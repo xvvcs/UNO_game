@@ -1,4 +1,4 @@
-import type { Card} from "./card.js";
+import type { Card } from "./card.js";
 import { CARD_COLORS, CARD_NUMBERS } from "./card.js";
 import { standardRandomizer, standardShuffler } from "../utils/random_utils.js";
 
@@ -64,8 +64,8 @@ export class UnoDeck implements Deck {
     return this.cards[this.cards.length - 1];
   }
   shuffleDeck(): void {
-   // Using Olle's randomizer util
-   this.cards = standardShuffler(standardRandomizer, this.cards);
+    // Using Olle's randomizer util
+    this.cards = standardShuffler(standardRandomizer, this.cards);
   }
   get size(): number {
     return this.cards.length;
