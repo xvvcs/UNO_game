@@ -1,9 +1,14 @@
 import { type Card, isSameCard} from "./card.js";
 
+export interface HandMemento {
+  readonly cards: Card[];
+}
+
 export interface PlayerHand {
   add(cardsToAdd: Card | Card[]): void;
   playCard(cardToPlay: Card): Card | undefined;
   hasCard(cardToCheck: Card): boolean;
+  toMemento(): HandMemento;
 
   readonly size: number;
   readonly cardsInHand: readonly Card[];
@@ -42,5 +47,12 @@ export class UnoPlayerHand implements PlayerHand {
 
   get size(): number{
     return this.hand.length;
+  }
+   toMemento(): HandMemento {
+    return { cards: [...this.hand] };
+  }
+ 
+  static fromMemento(memento: HandMemento): UnoPlayerHand {
+    return new UnoPlayerHand([...memento.cards]);
   }
 }

@@ -2,11 +2,16 @@ import type { Card } from "./card.js";
 import { CARD_COLORS, CARD_NUMBERS } from "./card.js";
 import { standardRandomizer, standardShuffler } from "../utils/random_utils.js";
 
+// Plain, JSON-serialisable snapshot of a Deck's state.
+export interface DeckMemento {
+  readonly cards: Card[];
+}
 export interface Deck {
   draw(): Card | undefined;
   add(cardsToAdd: Card | Card[]): void;
   checkCard(): Card | undefined;
   shuffleDeck(): void;
+  toMemento(): DeckMemento;
 
   readonly size: number;
 }
@@ -69,5 +74,14 @@ export class UnoDeck implements Deck {
   }
   get size(): number {
     return this.cards.length;
+  }
+  toMemento(): DeckMemento {
+    return { cards: [...this.cards] };
+  }
+ 
+  static fromMemento(memento: DeckMemento): UnoDeck {
+    const deck = new UnoDeck(false);
+    deck.add([...memento.cards]);
+    return deck;
   }
 }

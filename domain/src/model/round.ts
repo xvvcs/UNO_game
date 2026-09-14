@@ -9,8 +9,23 @@ import {
   type Shuffler,
 } from "../utils/random_utils.js";
 
-// Result of attempting to play a card 
+// Result of attempting to play a card - kept simple (no exceptions for
+// expected "illegal move" cases, since that's normal game flow, not an error).
 export type PlayResult = "played" | "not_your_turn" | "not_in_hand" | "illegal_card" | "missing_color";
+
+// Plain, JSON-serialisable snapshot of a Round's entire state - every
+// hand (including opponents'), both piles, whose turn it is, and so on.
+// Anyone holding one of these can rebuild an equivalent Round without
+// touching any of UnoRound's internals.
+export interface RoundMemento {
+  readonly hands: Card[][];
+  readonly drawPile: Card[];
+  readonly discardPile: Card[];
+  readonly currentPlayer: number;
+  readonly direction: 1 | -1;
+  readonly currentColor: CardColor;
+  readonly winner: number | undefined;
+}
 
 export interface Round {
   readonly playerCount: number;
@@ -25,6 +40,7 @@ export interface Round {
   canPlay(playerIndex: number, card: Card): boolean;
   play(playerIndex: number, card: Card, chosenColor?: CardColor): PlayResult;
   draw(playerIndex: number): Card | undefined;
+  toMemento(): RoundMemento;
 }
 
 export class UnoRound implements Round {
@@ -39,17 +55,32 @@ export class UnoRound implements Round {
   private color: CardColor;
   private roundWinner: number | undefined = undefined;
 
+  // Pass a player count to deal a fresh round, or a RoundMemento to restore
+  // one exactly as it was saved (used by fromMemento / test adapters).
   constructor(
-    playerCount: number,
+    playerCountOrMemento: number | RoundMemento,
     randomizer: Randomizer = standardRandomizer,
     shuffler: Shuffler<Card> = (ts) => standardShuffler(randomizer, ts),
   ) {
+    this.randomizer = randomizer;
+    this.shuffler = shuffler;
+
+    if (typeof playerCountOrMemento !== "number") {
+      const memento = playerCountOrMemento;
+      this.playerHands = memento.hands.map((cards) => new UnoPlayerHand([...cards]));
+      this.drawPile = UnoDeck.fromMemento({ cards: [...memento.drawPile] });
+      this.discardPile = UnoDeck.fromMemento({ cards: [...memento.discardPile] });
+      this.turn = memento.currentPlayer;
+      this.playDirection = memento.direction;
+      this.color = memento.currentColor;
+      this.roundWinner = memento.winner;
+      return;
+    }
+
+    const playerCount = playerCountOrMemento;
     if (playerCount < 2) {
       throw new Error("UNO needs at least 2 players");
     }
-
-    this.randomizer = randomizer;
-    this.shuffler = shuffler;
 
     this.drawPile = new UnoDeck(true);
     this.drawPile.shuffleDeck();
@@ -86,6 +117,14 @@ export class UnoRound implements Round {
 
     // The starter card's effect still applies before anyone has played.
     this.applyStarterEffect(starter);
+  }
+
+  static fromMemento(
+    memento: RoundMemento,
+    randomizer: Randomizer = standardRandomizer,
+    shuffler: Shuffler<Card> = (ts) => standardShuffler(randomizer, ts),
+  ): UnoRound {
+    return new UnoRound(memento, randomizer, shuffler);
   }
 
   private drawFromPile(): Card | undefined {
@@ -170,6 +209,18 @@ export class UnoRound implements Round {
     return this.roundWinner !== undefined;
   }
 
+  toMemento(): RoundMemento {
+    return {
+      hands: this.playerHands.map((hand) => [...hand.cardsInHand]),
+      drawPile: this.drawPile.toMemento().cards,
+      discardPile: this.discardPile.toMemento().cards,
+      currentPlayer: this.turn,
+      direction: this.playDirection,
+      currentColor: this.color,
+      winner: this.roundWinner,
+    };
+  }
+
   topCard(): Card {
     const top = this.discardPile.checkCard();
     if (!top) throw new Error("Discard pile is unexpectedly empty");
@@ -252,7 +303,7 @@ export class UnoRound implements Round {
       this.playerHands[playerIndex].add(card);
     }
     // Rule: "if a player can't match the card, they must draw a card
-    // instead" drawing stands in for a play, so the turn passes on.
+    // instead" - drawing stands in for a play, so the turn passes on.
     this.advanceTurn(1);
     return card;
   }
