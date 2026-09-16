@@ -60,7 +60,7 @@ export class UnoRound implements Round {
   constructor(
     playerCountOrMemento: number | RoundMemento,
     randomizer: Randomizer = standardRandomizer,
-    shuffler: Shuffler<Card> = (ts) => standardShuffler(randomizer, ts),
+    shuffler: Shuffler<Card> = standardShuffler,
   ) {
     this.randomizer = randomizer;
     this.shuffler = shuffler;
@@ -83,7 +83,7 @@ export class UnoRound implements Round {
     }
 
     this.drawPile = new UnoDeck(true);
-    this.drawPile.shuffleDeck();
+    this.drawPile.shuffle(this.shuffler);
     this.discardPile = new UnoDeck(false);
 
     // Deal 7 cards to every player
@@ -100,9 +100,9 @@ export class UnoRound implements Round {
     // Flip the starter card. A Draw 4 can't legally start a hand, so it goes
     // back in and we reshuffle; every other card is allowed to start.
     let starter = this.drawFromPile();
-    while (starter && starter.type === "draw_4") {
+    while (starter && starter.type === "WILD DRAW") {
       this.drawPile.add(starter);
-      this.drawPile.shuffleDeck();
+      this.drawPile.shuffle(this.shuffler);
       starter = this.drawFromPile();
     }
     if (!starter) {
@@ -122,7 +122,7 @@ export class UnoRound implements Round {
   static fromMemento(
     memento: RoundMemento,
     randomizer: Randomizer = standardRandomizer,
-    shuffler: Shuffler<Card> = (ts) => standardShuffler(randomizer, ts),
+    shuffler: Shuffler<Card> = standardShuffler,
   ): UnoRound {
     return new UnoRound(memento, randomizer, shuffler);
   }
@@ -143,23 +143,24 @@ export class UnoRound implements Round {
       card = this.discardPile.draw();
     }
     if (top) this.discardPile.add(top);
-    this.drawPile.add(this.shuffler(rest));
+    this.shuffler(rest);
+    this.drawPile.add(rest);
   }
 
   private applyStarterEffect(starter: Card): void {
     switch (starter.type) {
-      case "skip":
+      case "SKIP":
         this.turn = this.mod(1);
         break;
-      case "reverse":
+      case "REVERSE":
         this.playDirection = -1;
         break;
-      case "draw_2":
+      case "DRAW":
         this.forceDraw(0, 2);
         this.turn = this.mod(1);
         break;
       default:
-        // number, any_color: play simply starts with player 0
+        // NUMBERED, WILD: play simply starts with player 0
         break;
     }
   }
@@ -231,13 +232,13 @@ export class UnoRound implements Round {
     if (this.hasEnded || playerIndex !== this.turn) return false;
 
     // Wild cards can always be played regardless of the current colour/type.
-    if (card.type === "draw_4" || card.type === "any_color") return true;
+    if (card.type === "WILD DRAW" || card.type === "WILD") return true;
 
     if ("color" in card && card.color === this.color) return true;
 
     const top = this.topCard();
-    if (card.type === "number" && top.type === "number") {
-      return card.value === top.value;
+    if (card.type === "NUMBERED" && top.type === "NUMBERED") {
+      return card.number === top.number;
     }
     // Same special-card type (skip/reverse/draw_2) counts as a match too.
     return card.type === top.type;
@@ -250,7 +251,7 @@ export class UnoRound implements Round {
     if (!hand.hasCard(card)) return "not_in_hand";
     if (!this.canPlay(playerIndex, card)) return "illegal_card";
 
-    const isWild = card.type === "draw_4" || card.type === "any_color";
+    const isWild = card.type === "WILD DRAW" || card.type === "WILD";
     if (isWild && !chosenColor) return "missing_color";
 
     hand.playCard(card);
@@ -268,21 +269,21 @@ export class UnoRound implements Round {
     }
 
     switch (card.type) {
-      case "skip":
+      case "SKIP":
         this.advanceTurn(2);
         break;
-      case "reverse":
+      case "REVERSE":
         this.playDirection = this.playDirection === 1 ? -1 : 1;
         // With exactly 2 players a reverse behaves like a skip.
         this.advanceTurn(this.playerCount === 2 ? 2 : 1);
         break;
-      case "draw_2": {
+      case "DRAW": {
         const next = this.mod(this.turn + this.playDirection);
         this.forceDraw(next, 2);
         this.advanceTurn(2);
         break;
       }
-      case "draw_4": {
+      case "WILD DRAW": {
         const next = this.mod(this.turn + this.playDirection);
         this.forceDraw(next, 4);
         this.advanceTurn(2);
