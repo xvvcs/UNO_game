@@ -13,6 +13,7 @@ export interface Deck {
   deal(): Card | undefined;
   add(cardsToAdd: Card | Card[]): void;
   top(): Card | undefined;
+  peek(): Card | undefined;
   shuffle(shuffler?: Shuffler<Card>): void;
   filter(predicate: (card: Card) => boolean): Deck;
   toMemento(): DeckMemento;
@@ -71,6 +72,9 @@ export class UnoDeck implements Deck {
   }
   top(): Card | undefined {
     return this.cards[0];
+  }
+  peek(): Card | undefined {
+    return this.top();
   }
   shuffle(shuffler: Shuffler<Card> = standardShuffler): void {
     shuffler(this.cards);

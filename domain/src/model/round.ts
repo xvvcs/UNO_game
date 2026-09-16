@@ -9,10 +9,6 @@ import {
   type Shuffler,
 } from "../utils/random_utils.js";
 
-// Result of attempting to play a card - kept simple (no exceptions for
-// expected "illegal move" cases, since that's normal game flow, not an error).
-export type PlayResult = "played" | "not_your_turn" | "not_in_hand" | "illegal_card" | "missing_color";
-
 export interface RoundConfig {
   readonly players: string[];
   readonly dealer: number;
@@ -37,9 +33,6 @@ export interface RoundMemento {
 export interface Round {
   readonly playerCount: number;
   readonly dealer: number;
-  readonly hands: readonly PlayerHand[];
-  readonly currentPlayer: number;
-  readonly direction: 1 | -1;
   readonly currentColor: CardColor;
   readonly winner: number | undefined;
   readonly hasEnded: boolean;
@@ -50,9 +43,10 @@ export interface Round {
   drawPile(): Deck;
   discardPile(): Deck;
   topCard(): Card;
-  canPlay(playerIndex: number, card: Card): boolean;
-  play(playerIndex: number, card: Card, chosenColor?: CardColor): PlayResult;
-  draw(playerIndex: number): Card | undefined;
+  canPlay(cardIndex: number): boolean;
+  canPlayAny(): boolean;
+  play(cardIndex: number, color?: CardColor): Card;
+  draw(): Card | undefined;
   toMemento(): RoundMemento;
 }
 
@@ -164,10 +158,11 @@ export class UnoRound implements Round {
   }
 
   private drawFromPile(): Card | undefined {
+    const card = this.drawDeck.deal();
     if (this.drawDeck.size === 0) {
       this.reshuffleDiscardIntoDrawPile();
     }
-    return this.drawDeck.deal();
+    return card;
   }
 
   private reshuffleDiscardIntoDrawPile(): void {
@@ -227,18 +222,6 @@ export class UnoRound implements Round {
     return this.dealerIndex;
   }
 
-  get hands(): readonly PlayerHand[] {
-    return this.playerHands;
-  }
-
-  get currentPlayer(): number {
-    return this.turn;
-  }
-
-  get direction(): 1 | -1 {
-    return this.playDirection;
-  }
-
   get currentColor(): CardColor {
     return this.color;
   }
@@ -292,42 +275,49 @@ export class UnoRound implements Round {
     return top;
   }
 
-  canPlay(playerIndex: number, card: Card): boolean {
-    if (this.hasEnded || playerIndex !== this.turn) return false;
+  canPlay(cardIndex: number): boolean {
+    if (this.hasEnded) return false;
+    const hand = this.playerHands[this.turn].cardsInHand;
+    const card = hand[cardIndex];
+    if (card === undefined) return false;
 
-    // Wild cards can always be played regardless of the current colour/type.
-    if (card.type === "WILD DRAW" || card.type === "WILD") return true;
+    // A wild can always be played; a wild draw 4 only when no card matches the colour.
+    if (card.type === "WILD") return true;
+    if (card.type === "WILD DRAW") return !hand.some((c) => "color" in c && c.color === this.color);
 
-    if ("color" in card && card.color === this.color) return true;
+    if (card.color === this.color) return true;
 
     const top = this.topCard();
     if (card.type === "NUMBERED" && top.type === "NUMBERED") {
       return card.number === top.number;
     }
-    // Same special-card type (skip/reverse/draw_2) counts as a match too.
+    // Same special-card type (skip/reverse/draw) counts as a match too.
     return card.type === top.type;
   }
 
-  play(playerIndex: number, card: Card, chosenColor?: CardColor): PlayResult {
-    if (this.hasEnded || playerIndex !== this.turn) return "not_your_turn";
+  canPlayAny(): boolean {
+    return this.playerHands[this.turn].cardsInHand.some((_, i) => this.canPlay(i));
+  }
 
-    const hand = this.playerHands[playerIndex];
-    if (!hand.hasCard(card)) return "not_in_hand";
-    if (!this.canPlay(playerIndex, card)) return "illegal_card";
+  play(cardIndex: number, color?: CardColor): Card {
+    if (!this.canPlay(cardIndex)) throw new Error("Illegal play");
 
+    const hand = this.playerHands[this.turn];
+    const card = hand.cardsInHand[cardIndex];
     const isWild = card.type === "WILD DRAW" || card.type === "WILD";
-    if (isWild && !chosenColor) return "missing_color";
+    if (isWild && color === undefined) throw new Error("A wild card needs a colour");
+    if (!isWild && color !== undefined) throw new Error("Only a wild card takes a colour");
 
     hand.playCard(card);
     this.discardDeck.add(card);
 
     if (hand.size === 0) {
-      this.roundWinner = playerIndex;
-      return "played";
+      this.roundWinner = this.turn;
+      return card;
     }
 
-    if (isWild && chosenColor) {
-      this.color = chosenColor;
+    if (isWild && color) {
+      this.color = color;
     } else if ("color" in card) {
       this.color = card.color;
     }
@@ -357,19 +347,21 @@ export class UnoRound implements Round {
         this.advanceTurn(1);
     }
 
-    return "played";
+    return card;
   }
 
-  draw(playerIndex: number): Card | undefined {
-    if (this.hasEnded || playerIndex !== this.turn) return undefined;
+  draw(): Card | undefined {
+    if (this.hasEnded) return undefined;
 
+    const hand = this.playerHands[this.turn];
     const card = this.drawFromPile();
     if (card) {
-      this.playerHands[playerIndex].add(card);
+      hand.add(card);
     }
-    // Rule: "if a player can't match the card, they must draw a card
-    // instead" - drawing stands in for a play, so the turn passes on.
-    this.advanceTurn(1);
+    // The turn only passes on if the drawn card cannot be played.
+    if (card === undefined || !this.canPlay(hand.size - 1)) {
+      this.advanceTurn(1);
+    }
     return card;
   }
 }

@@ -7,7 +7,6 @@ export interface HandMemento {
 export interface PlayerHand {
   add(cardsToAdd: Card | Card[]): void;
   playCard(cardToPlay: Card): Card | undefined;
-  hasCard(cardToCheck: Card): boolean;
   toMemento(): HandMemento;
 
   readonly size: number;
@@ -35,10 +34,6 @@ export class UnoPlayerHand implements PlayerHand {
       return undefined; // if selected card is not in hand returns index -1 so undefined
     }
     return this.hand.splice(index, 1)[0]; // returns played card and removes it from hand
-  }
-  hasCard(cardToCheck: Card): boolean{
-    const index = this.hand.findIndex((c) => isSameCard(c, cardToCheck)); 
-    return index !== -1;
   }
 
   get cardsInHand(): readonly Card[]{
