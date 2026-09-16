@@ -1,36 +1,36 @@
 export const CARD_NUMBERS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0] as const;
-export const CARD_COLORS = ["Blue", "Green", "Red", "Yellow"] as const; 
+export const CARD_COLORS = ["BLUE", "GREEN", "RED", "YELLOW"] as const; 
 
 export type CardNumber = (typeof CARD_NUMBERS)[number];
 export type CardColor = (typeof CARD_COLORS)[number];
 
 export type NumberedCard = {
-  readonly type: "number";
+  readonly type: "NUMBERED";
   readonly color: CardColor;
-  readonly value: CardNumber;
+  readonly number: CardNumber;
 };
 
 export type SkipCard = {
-  readonly type: "skip";
+  readonly type: "SKIP";
   readonly color: CardColor;
 };
 
 export type ReverseCard = {
-  readonly type: "reverse";
+  readonly type: "REVERSE";
   readonly color: CardColor;
 };
 
 export type Draw2Card = {
-  readonly type: "draw_2";
+  readonly type: "DRAW";
   readonly color: CardColor;
 };
 
 export type Draw4Card = {
-  readonly type: "draw_4";
+  readonly type: "WILD DRAW";
 };
 
 export type WildAnyColorCard = {
-  readonly type: "any_color";
+  readonly type: "WILD";
 };
 
 export type ActionCard = SkipCard | ReverseCard | Draw2Card;
@@ -43,7 +43,15 @@ export type Type = Card["type"];
 
 export type TypedCard<T extends Type> = Extract<Card, { type: T }>;
 
-// Helper functions for identifying cards 
+// Helper functions for identifying cards
+export function hasColor(card: Card, color: CardColor): boolean {
+  return "color" in card && card.color === color;
+}
+
+export function hasNumber(card: Card, number: CardNumber): boolean {
+  return card.type === "NUMBERED" && card.number === number;
+}
+
 export function isSameCard(card1: Card, card2: Card): boolean{
   if(card1.type !== card2.type){
     return false;
@@ -52,8 +60,8 @@ export function isSameCard(card1: Card, card2: Card): boolean{
     if(card1.color !== card2.color){
       return false;
     }
-    if(card1.type === "number" && card2.type === "number"){
-      return card1.value === card2.value;
+    if(card1.type === "NUMBERED" && card2.type === "NUMBERED"){
+      return card1.number === card2.number;
     }
   }
   return true;
