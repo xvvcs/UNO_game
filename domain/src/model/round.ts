@@ -68,8 +68,8 @@ export class UnoRound implements Round {
     if (typeof playerCountOrMemento !== "number") {
       const memento = playerCountOrMemento;
       this.playerHands = memento.hands.map((cards) => new UnoPlayerHand([...cards]));
-      this.drawPile = UnoDeck.fromMemento({ cards: [...memento.drawPile] });
-      this.discardPile = UnoDeck.fromMemento({ cards: [...memento.discardPile] });
+      this.drawPile = UnoDeck.fromMemento(memento.drawPile);
+      this.discardPile = UnoDeck.fromMemento(memento.discardPile);
       this.turn = memento.currentPlayer;
       this.playDirection = memento.direction;
       this.color = memento.currentColor;
@@ -131,16 +131,16 @@ export class UnoRound implements Round {
     if (this.drawPile.size === 0) {
       this.reshuffleDiscardIntoDrawPile();
     }
-    return this.drawPile.draw();
+    return this.drawPile.deal();
   }
 
   private reshuffleDiscardIntoDrawPile(): void {
-    const top = this.discardPile.draw();
+    const top = this.discardPile.deal();
     const rest: Card[] = [];
-    let card = this.discardPile.draw();
+    let card = this.discardPile.deal();
     while (card) {
       rest.push(card);
-      card = this.discardPile.draw();
+      card = this.discardPile.deal();
     }
     if (top) this.discardPile.add(top);
     this.shuffler(rest);
@@ -213,8 +213,8 @@ export class UnoRound implements Round {
   toMemento(): RoundMemento {
     return {
       hands: this.playerHands.map((hand) => [...hand.cardsInHand]),
-      drawPile: this.drawPile.toMemento().cards,
-      discardPile: this.discardPile.toMemento().cards,
+      drawPile: this.drawPile.toMemento(),
+      discardPile: this.discardPile.toMemento(),
       currentPlayer: this.turn,
       direction: this.playDirection,
       currentColor: this.color,
@@ -223,7 +223,7 @@ export class UnoRound implements Round {
   }
 
   topCard(): Card {
-    const top = this.discardPile.checkCard();
+    const top = this.discardPile.top();
     if (!top) throw new Error("Discard pile is unexpectedly empty");
     return top;
   }

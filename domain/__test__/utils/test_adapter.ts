@@ -1,16 +1,17 @@
 import { Randomizer, Shuffler, standardRandomizer, standardShuffler } from '../../src/utils/random_utils'
+import { Card, Deck, UnoDeck } from '../../src/model/deck'
 
 // Fix (or import) these types:
-type Card = any
-type Deck = any
 type Round = any
 type Game = any
 
 //Fill out the empty functions
 export function createInitialDeck(): Deck {
+  return new UnoDeck()
 }
 
 export function createDeckFromMemento(cards: Record<string, string | number>[]): Deck {
+  return UnoDeck.fromMemento(cards)
 }
 
 export type HandConfig = {
