@@ -1,8 +1,8 @@
 import { Randomizer, Shuffler, standardRandomizer, standardShuffler } from '../../src/utils/random_utils'
 import { Card, Deck, UnoDeck } from '../../src/model/deck'
+import { Round, UnoRound } from '../../src/model/round'
 
 // Fix (or import) these types:
-type Round = any
 type Game = any
 
 //Fill out the empty functions
@@ -27,9 +27,11 @@ export function createRound({
     shuffler = standardShuffler,
     cardsPerPlayer = 7
   }: HandConfig): Round {
+  return new UnoRound({ players, dealer, cardsPerPlayer }, standardRandomizer, shuffler)
 }
 
 export function createRoundFromMemento(memento: any, shuffler: Shuffler<Card> = standardShuffler): Round {
+  return UnoRound.fromMemento(memento, standardRandomizer, shuffler)
 }
 
 export type GameConfig = {
