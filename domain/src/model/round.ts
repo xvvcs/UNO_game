@@ -308,13 +308,9 @@ export class UnoRound implements Round {
     if (isWild && color === undefined) throw new Error("A wild card needs a colour");
     if (!isWild && color !== undefined) throw new Error("Only a wild card takes a colour");
 
+    const player = this.turn;
     hand.playCard(card);
     this.discardDeck.add(card);
-
-    if (hand.size === 0) {
-      this.roundWinner = this.turn;
-      return card;
-    }
 
     if (isWild && color) {
       this.color = color;
@@ -345,6 +341,10 @@ export class UnoRound implements Round {
       }
       default:
         this.advanceTurn(1);
+    }
+
+    if (hand.size === 0) {
+      this.roundWinner = player;
     }
 
     return card;
