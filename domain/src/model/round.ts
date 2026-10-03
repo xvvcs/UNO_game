@@ -351,7 +351,7 @@ export class UnoRound implements Round {
   }
 
   draw(): Card | undefined {
-    if (this.hasEnded()) return undefined;
+    if (this.hasEnded()) throw new Error("The round has ended");
 
     const hand = this.playerHands[this.turn];
     const card = this.drawFromPile();
