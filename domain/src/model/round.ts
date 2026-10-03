@@ -1,5 +1,5 @@
 import type { Card, CardColor } from "./card.js";
-import { CARD_COLORS } from "./card.js";
+import { CARD_COLORS, cardPoints } from "./card.js";
 import { UnoDeck, type Deck } from "./deck.js";
 import { UnoPlayerHand, type PlayerHand } from "./playerHand.js";
 import {
@@ -37,6 +37,7 @@ export interface Round {
 
   winner(): number | undefined;
   hasEnded(): boolean;
+  score(): number | undefined;
   player(playerIndex: number): string;
   playerHand(playerIndex: number): readonly Card[];
   playerInTurn(): number | undefined;
@@ -232,6 +233,13 @@ export class UnoRound implements Round {
 
   hasEnded(): boolean {
     return this.roundWinner !== undefined;
+  }
+
+  score(): number | undefined {
+    if (!this.hasEnded()) return undefined;
+    return this.playerHands
+      .flatMap((hand) => hand.cardsInHand)
+      .reduce((sum, card) => sum + cardPoints(card), 0);
   }
 
   player(playerIndex: number): string {

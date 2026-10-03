@@ -52,6 +52,20 @@ export function hasNumber(card: Card, number: CardNumber): boolean {
   return card.type === "NUMBERED" && card.number === number;
 }
 
+export function cardPoints(card: Card): number {
+  switch (card.type) {
+    case "NUMBERED":
+      return card.number;
+    case "SKIP":
+    case "REVERSE":
+    case "DRAW":
+      return 20;
+    case "WILD":
+    case "WILD DRAW":
+      return 50;
+  }
+}
+
 export function isSameCard(card1: Card, card2: Card): boolean{
   if(card1.type !== card2.type){
     return false;
