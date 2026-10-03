@@ -34,9 +34,9 @@ export interface Round {
   readonly playerCount: number;
   readonly dealer: number;
   readonly currentColor: CardColor;
-  readonly winner: number | undefined;
-  readonly hasEnded: boolean;
 
+  winner(): number | undefined;
+  hasEnded(): boolean;
   player(playerIndex: number): string;
   playerHand(playerIndex: number): readonly Card[];
   playerInTurn(): number | undefined;
@@ -226,11 +226,11 @@ export class UnoRound implements Round {
     return this.color;
   }
 
-  get winner(): number | undefined {
+  winner(): number | undefined {
     return this.roundWinner;
   }
 
-  get hasEnded(): boolean {
+  hasEnded(): boolean {
     return this.roundWinner !== undefined;
   }
 
@@ -245,7 +245,7 @@ export class UnoRound implements Round {
   }
 
   playerInTurn(): number | undefined {
-    return this.hasEnded ? undefined : this.turn;
+    return this.hasEnded() ? undefined : this.turn;
   }
 
   drawPile(): Deck {
@@ -276,7 +276,7 @@ export class UnoRound implements Round {
   }
 
   canPlay(cardIndex: number): boolean {
-    if (this.hasEnded) return false;
+    if (this.hasEnded()) return false;
     const hand = this.playerHands[this.turn].cardsInHand;
     const card = hand[cardIndex];
     if (card === undefined) return false;
@@ -351,7 +351,7 @@ export class UnoRound implements Round {
   }
 
   draw(): Card | undefined {
-    if (this.hasEnded) return undefined;
+    if (this.hasEnded()) return undefined;
 
     const hand = this.playerHands[this.turn];
     const card = this.drawFromPile();
