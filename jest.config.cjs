@@ -1,6 +1,7 @@
 // Jest setup matching the course's oo-model project (jest + babel-jest).
 // `.cjs` because package.json has "type": "module".
 module.exports = {
+  roots: ['<rootDir>/domain'],
   testEnvironment: 'node',
   coverageProvider: 'v8',
   testPathIgnorePatterns: ['/node_modules/', '/dist/'],

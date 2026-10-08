@@ -60,3 +60,7 @@ storybook-static/
 
 # pnpm specific
 .pnpm-debug.log*
+
+# Vue client tooling
+.eslintcache
+*.timestamp-*-*.mjs
