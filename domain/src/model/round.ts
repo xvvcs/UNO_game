@@ -2,6 +2,7 @@ import type { Card, CardColor } from "./card.js";
 import { CARD_COLORS, cardPoints } from "./card.js";
 import { UnoDeck, type Deck } from "./deck.js";
 import { UnoPlayerHand, type PlayerHand } from "./playerHand.js";
+import { UnoCallTracker } from "./unoCallTracker.js";
 import {
   standardRandomizer,
   standardShuffler,
@@ -16,6 +17,8 @@ export interface RoundConfig {
 }
 
 export type RoundEndEvent = { readonly winner: number };
+
+export type UnoAccusation = { readonly accuser: number; readonly accused: number };
 
 // Plain, JSON-serialisable snapshot of a Round's entire state - every
 // hand (including opponents'), both piles, whose turn it is, and so on.
@@ -50,6 +53,8 @@ export interface Round {
   canPlayAny(): boolean;
   play(cardIndex: number, color?: CardColor): Card;
   draw(): Card | undefined;
+  sayUno(playerIndex: number): void;
+  catchUnoFailure(accusation: UnoAccusation): boolean;
   onEnd(callback: (event: RoundEndEvent) => void): void;
   toMemento(): RoundMemento;
 }
@@ -68,6 +73,7 @@ export class UnoRound implements Round {
   private color: CardColor;
   private roundWinner: number | undefined = undefined;
   private readonly endCallbacks: ((event: RoundEndEvent) => void)[] = [];
+  private readonly unoCallTracker = new UnoCallTracker();
 
   // Pass a config to deal a fresh round, or a RoundMemento to restore
   // one exactly as it was saved (used by fromMemento / test adapters).
@@ -323,6 +329,7 @@ export class UnoRound implements Round {
     const player = this.turn;
     hand.playCard(card);
     this.discardDeck.add(card);
+    this.unoCallTracker.recordPlay(player, hand.size);
 
     if (isWild && color) {
       this.color = color;
@@ -370,6 +377,7 @@ export class UnoRound implements Round {
   draw(): Card | undefined {
     if (this.hasEnded()) throw new Error("The round has ended");
 
+    this.unoCallTracker.recordDraw(this.turn);
     const hand = this.playerHands[this.turn];
     const card = this.drawFromPile();
     if (card) {
@@ -380,5 +388,26 @@ export class UnoRound implements Round {
       this.advanceTurn(1);
     }
     return card;
+  }
+
+  sayUno(playerIndex: number): void {
+    if (this.hasEnded()) throw new Error("The round has ended");
+    this.assertPlayer(playerIndex);
+    this.unoCallTracker.sayUno(playerIndex);
+  }
+
+  catchUnoFailure({ accuser, accused }: UnoAccusation): boolean {
+    this.assertPlayer(accuser);
+    this.assertPlayer(accused);
+    if (this.hasEnded()) return false;
+    if (!this.unoCallTracker.catchUnoFailure(accused)) return false;
+    this.forceDraw(accused, 4);
+    return true;
+  }
+
+  private assertPlayer(playerIndex: number): void {
+    if (!Number.isInteger(playerIndex) || playerIndex < 0 || playerIndex >= this.playerCount) {
+      throw new Error("Player index out of bounds");
+    }
   }
 }
