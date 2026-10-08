@@ -5,6 +5,7 @@ import { CardPiles } from "./cardPiles.js";
 import { UnoPlayerHand, type PlayerHand } from "./playerHand.js";
 import { UnoCallTracker } from "./unoCallTracker.js";
 import { canCardBePlayed } from "./rules.js";
+import { TurnOrder, type PlayDirection } from "./turnOrder.js";
 import {
   standardRandomizer,
   standardShuffler,
@@ -32,7 +33,7 @@ export interface RoundMemento {
   readonly drawPile: Card[];
   readonly discardPile: Card[];
   readonly currentColor: CardColor;
-  readonly currentDirection: "clockwise" | "counterclockwise";
+  readonly currentDirection: PlayDirection;
   readonly dealer: number;
   readonly playerInTurn?: number | undefined;
 }
@@ -68,8 +69,7 @@ export class UnoRound implements Round {
   private readonly cardPiles: CardPiles;
   private readonly randomizer: Randomizer;
 
-  private turn = 0;
-  private playDirection: 1 | -1 = 1;
+  private readonly turnOrder: TurnOrder;
   private color: CardColor;
   private roundWinner: number | undefined = undefined;
   private readonly endCallbacks: ((event: RoundEndEvent) => void)[] = [];
@@ -103,9 +103,8 @@ export class UnoRound implements Round {
       this.dealerIndex = dealer;
       this.playerHands = hands.map((cards) => new UnoPlayerHand([...cards]));
       this.cardPiles = CardPiles.fromMemento(memento.drawPile, memento.discardPile, shuffler);
-      this.playDirection = memento.currentDirection === "clockwise" ? 1 : -1;
+      this.turnOrder = new TurnOrder(players.length, playerInTurn ?? 0, memento.currentDirection);
       this.color = memento.currentColor;
-      this.turn = playerInTurn ?? 0;
       this.roundWinner = emptyHands[0];
 
       const top = this.cardPiles.topOfDiscardPile();
@@ -151,7 +150,7 @@ export class UnoRound implements Round {
       "color" in starter ? starter.color : CARD_COLORS[this.randomizer(CARD_COLORS.length)];
 
     // The starter card's effect still applies before anyone has played.
-    this.turn = this.mod(dealer + 1);
+    this.turnOrder = new TurnOrder(players.length, dealer);
     this.applyStarterEffect(starter);
   }
 
@@ -166,25 +165,25 @@ export class UnoRound implements Round {
   private applyStarterEffect(starter: Card): void {
     switch (starter.type) {
       case "SKIP":
-        this.advanceTurn(1);
+        this.turnOrder.skipNextPlayer();
         break;
       case "REVERSE":
-        this.playDirection = -1;
-        this.turn = this.mod(this.dealerIndex - 1);
+        this.turnOrder.reverseDirection();
+        this.turnOrder.passTurn();
         break;
       case "DRAW":
-        this.forceDraw(this.turn, 2);
-        this.advanceTurn(1);
+        this.forceDraw(this.turnOrder.nextPlayer(), 2);
+        this.turnOrder.skipNextPlayer();
         break;
       default:
         // NUMBERED, WILD: play simply starts with the player after the dealer
+        this.turnOrder.passTurn();
         break;
     }
   }
 
-  private mod(index: number): number {
-    const n = this.playerHands.length;
-    return ((index % n) + n) % n;
+  private handOfPlayerInTurn(): PlayerHand {
+    return this.playerHands[this.turnOrder.currentPlayer];
   }
 
   private forceDraw(playerIndex: number, count: number): void {
@@ -193,10 +192,6 @@ export class UnoRound implements Round {
       const card = this.cardPiles.drawCard();
       if (card) hand.add(card);
     }
-  }
-
-  private advanceTurn(steps: number): void {
-    this.turn = this.mod(this.turn + steps * this.playDirection);
   }
 
   get playerCount(): number {
@@ -237,7 +232,7 @@ export class UnoRound implements Round {
   }
 
   playerInTurn(): number | undefined {
-    return this.hasEnded() ? undefined : this.turn;
+    return this.hasEnded() ? undefined : this.turnOrder.currentPlayer;
   }
 
   drawPile(): Deck {
@@ -255,7 +250,7 @@ export class UnoRound implements Round {
       drawPile: this.cardPiles.drawPile.toMemento(),
       discardPile: this.cardPiles.discardPile.toMemento(),
       currentColor: this.color,
-      currentDirection: this.playDirection === 1 ? "clockwise" : "counterclockwise",
+      currentDirection: this.turnOrder.direction,
       dealer: this.dealerIndex,
       playerInTurn: this.playerInTurn(),
     };
@@ -267,26 +262,26 @@ export class UnoRound implements Round {
 
   canPlay(cardIndex: number): boolean {
     if (this.hasEnded()) return false;
-    const hand = this.playerHands[this.turn].cardsInHand;
+    const hand = this.handOfPlayerInTurn().cardsInHand;
     const card = hand[cardIndex];
     if (card === undefined) return false;
     return canCardBePlayed(card, { hand, topCard: this.topCard(), currentColor: this.color });
   }
 
   canPlayAny(): boolean {
-    return this.playerHands[this.turn].cardsInHand.some((_, i) => this.canPlay(i));
+    return this.handOfPlayerInTurn().cardsInHand.some((_, i) => this.canPlay(i));
   }
 
   play(cardIndex: number, color?: CardColor): Card {
     if (!this.canPlay(cardIndex)) throw new Error("Illegal play");
 
-    const hand = this.playerHands[this.turn];
+    const hand = this.handOfPlayerInTurn();
     const card = hand.cardsInHand[cardIndex];
     const isWild = card.type === "WILD DRAW" || card.type === "WILD";
     if (isWild && color === undefined) throw new Error("A wild card needs a colour");
     if (!isWild && color !== undefined) throw new Error("Only a wild card takes a colour");
 
-    const player = this.turn;
+    const player = this.turnOrder.currentPlayer;
     hand.playCard(card);
     this.cardPiles.discardCard(card);
     this.unoCallTracker.recordPlay(player, hand.size);
@@ -299,27 +294,24 @@ export class UnoRound implements Round {
 
     switch (card.type) {
       case "SKIP":
-        this.advanceTurn(2);
+        this.turnOrder.skipNextPlayer();
         break;
       case "REVERSE":
-        this.playDirection = this.playDirection === 1 ? -1 : 1;
+        this.turnOrder.reverseDirection();
         // With exactly 2 players a reverse behaves like a skip.
-        this.advanceTurn(this.playerCount === 2 ? 2 : 1);
+        if (this.playerCount === 2) this.turnOrder.skipNextPlayer();
+        else this.turnOrder.passTurn();
         break;
-      case "DRAW": {
-        const next = this.mod(this.turn + this.playDirection);
-        this.forceDraw(next, 2);
-        this.advanceTurn(2);
+      case "DRAW":
+        this.forceDraw(this.turnOrder.nextPlayer(), 2);
+        this.turnOrder.skipNextPlayer();
         break;
-      }
-      case "WILD DRAW": {
-        const next = this.mod(this.turn + this.playDirection);
-        this.forceDraw(next, 4);
-        this.advanceTurn(2);
+      case "WILD DRAW":
+        this.forceDraw(this.turnOrder.nextPlayer(), 4);
+        this.turnOrder.skipNextPlayer();
         break;
-      }
       default:
-        this.advanceTurn(1);
+        this.turnOrder.passTurn();
     }
 
     if (hand.size === 0) {
@@ -337,15 +329,15 @@ export class UnoRound implements Round {
   draw(): Card | undefined {
     if (this.hasEnded()) throw new Error("The round has ended");
 
-    this.unoCallTracker.recordDraw(this.turn);
-    const hand = this.playerHands[this.turn];
+    this.unoCallTracker.recordDraw(this.turnOrder.currentPlayer);
+    const hand = this.handOfPlayerInTurn();
     const card = this.cardPiles.drawCard();
     if (card) {
       hand.add(card);
     }
     // The turn only passes on if the drawn card cannot be played.
     if (card === undefined || !this.canPlay(hand.size - 1)) {
-      this.advanceTurn(1);
+      this.turnOrder.passTurn();
     }
     return card;
   }
