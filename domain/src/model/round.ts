@@ -1,6 +1,7 @@
 import type { Card, CardColor } from "./card.js";
 import { CARD_COLORS, cardPoints } from "./card.js";
-import { UnoDeck, type Deck } from "./deck.js";
+import type { Deck } from "./deck.js";
+import { CardPiles } from "./cardPiles.js";
 import { UnoPlayerHand, type PlayerHand } from "./playerHand.js";
 import { UnoCallTracker } from "./unoCallTracker.js";
 import { canCardBePlayed } from "./rules.js";
@@ -64,10 +65,8 @@ export class UnoRound implements Round {
   private readonly players: string[];
   private readonly dealerIndex: number;
   private readonly playerHands: PlayerHand[];
-  private readonly drawDeck: Deck;
-  private readonly discardDeck: Deck;
+  private readonly cardPiles: CardPiles;
   private readonly randomizer: Randomizer;
-  private readonly shuffler: Shuffler<Card>;
 
   private turn = 0;
   private playDirection: 1 | -1 = 1;
@@ -84,7 +83,6 @@ export class UnoRound implements Round {
     shuffler: Shuffler<Card> = standardShuffler,
   ) {
     this.randomizer = randomizer;
-    this.shuffler = shuffler;
 
     if ("hands" in configOrMemento) {
       const memento = configOrMemento;
@@ -104,14 +102,13 @@ export class UnoRound implements Round {
       this.players = [...players];
       this.dealerIndex = dealer;
       this.playerHands = hands.map((cards) => new UnoPlayerHand([...cards]));
-      this.drawDeck = UnoDeck.fromMemento(memento.drawPile);
-      this.discardDeck = UnoDeck.fromMemento(memento.discardPile);
+      this.cardPiles = CardPiles.fromMemento(memento.drawPile, memento.discardPile, shuffler);
       this.playDirection = memento.currentDirection === "clockwise" ? 1 : -1;
       this.color = memento.currentColor;
       this.turn = playerInTurn ?? 0;
       this.roundWinner = emptyHands[0];
 
-      const top = this.discardDeck.top()!;
+      const top = this.cardPiles.topOfDiscardPile();
       if ("color" in top && top.color !== this.color) throw new Error("Invalid round memento");
       return;
     }
@@ -123,16 +120,14 @@ export class UnoRound implements Round {
     this.players = [...players];
     this.dealerIndex = dealer;
 
-    this.drawDeck = new UnoDeck(true);
-    this.drawDeck.shuffle(this.shuffler);
-    this.discardDeck = new UnoDeck(false);
+    this.cardPiles = CardPiles.shuffledFullDeck(shuffler);
 
     // Deal cards to every player
     this.playerHands = [];
     for (let p = 0; p < players.length; p++) {
       const dealt: Card[] = [];
       for (let i = 0; i < cardsPerPlayer; i++) {
-        const card = this.drawFromPile();
+        const card = this.cardPiles.drawCard();
         if (card) dealt.push(card);
       }
       this.playerHands.push(new UnoPlayerHand(dealt));
@@ -140,16 +135,15 @@ export class UnoRound implements Round {
 
     // Flip the starter card. A wild card can't start a hand, so it goes
     // back in and we reshuffle; every other card is allowed to start.
-    let starter = this.drawFromPile();
+    let starter = this.cardPiles.drawCard();
     while (starter && (starter.type === "WILD DRAW" || starter.type === "WILD")) {
-      this.drawDeck.add(starter);
-      this.drawDeck.shuffle(this.shuffler);
-      starter = this.drawFromPile();
+      this.cardPiles.shuffleBackIntoDrawPile(starter);
+      starter = this.cardPiles.drawCard();
     }
     if (!starter) {
       throw new Error("Not enough cards to start a round");
     }
-    this.discardDeck.add(starter);
+    this.cardPiles.discardCard(starter);
 
     // Simplification: an "any colour" starter has no colour of its own, so
     // we pick one for it rather than making the first player choose.
@@ -167,27 +161,6 @@ export class UnoRound implements Round {
     shuffler: Shuffler<Card> = standardShuffler,
   ): UnoRound {
     return new UnoRound(memento, randomizer, shuffler);
-  }
-
-  private drawFromPile(): Card | undefined {
-    const card = this.drawDeck.deal();
-    if (this.drawDeck.size === 0) {
-      this.reshuffleDiscardIntoDrawPile();
-    }
-    return card;
-  }
-
-  private reshuffleDiscardIntoDrawPile(): void {
-    const top = this.discardDeck.deal();
-    const rest: Card[] = [];
-    let card = this.discardDeck.deal();
-    while (card) {
-      rest.push(card);
-      card = this.discardDeck.deal();
-    }
-    if (top) this.discardDeck.add(top);
-    this.shuffler(rest);
-    this.drawDeck.add(rest);
   }
 
   private applyStarterEffect(starter: Card): void {
@@ -217,7 +190,7 @@ export class UnoRound implements Round {
   private forceDraw(playerIndex: number, count: number): void {
     const hand = this.playerHands[playerIndex];
     for (let i = 0; i < count; i++) {
-      const card = this.drawFromPile();
+      const card = this.cardPiles.drawCard();
       if (card) hand.add(card);
     }
   }
@@ -268,19 +241,19 @@ export class UnoRound implements Round {
   }
 
   drawPile(): Deck {
-    return this.drawDeck;
+    return this.cardPiles.drawPile;
   }
 
   discardPile(): Deck {
-    return this.discardDeck;
+    return this.cardPiles.discardPile;
   }
 
   toMemento(): RoundMemento {
     return {
       players: [...this.players],
       hands: this.playerHands.map((hand) => [...hand.cardsInHand]),
-      drawPile: this.drawDeck.toMemento(),
-      discardPile: this.discardDeck.toMemento(),
+      drawPile: this.cardPiles.drawPile.toMemento(),
+      discardPile: this.cardPiles.discardPile.toMemento(),
       currentColor: this.color,
       currentDirection: this.playDirection === 1 ? "clockwise" : "counterclockwise",
       dealer: this.dealerIndex,
@@ -289,9 +262,7 @@ export class UnoRound implements Round {
   }
 
   topCard(): Card {
-    const top = this.discardDeck.top();
-    if (!top) throw new Error("Discard pile is unexpectedly empty");
-    return top;
+    return this.cardPiles.topOfDiscardPile();
   }
 
   canPlay(cardIndex: number): boolean {
@@ -317,7 +288,7 @@ export class UnoRound implements Round {
 
     const player = this.turn;
     hand.playCard(card);
-    this.discardDeck.add(card);
+    this.cardPiles.discardCard(card);
     this.unoCallTracker.recordPlay(player, hand.size);
 
     if (isWild && color) {
@@ -368,7 +339,7 @@ export class UnoRound implements Round {
 
     this.unoCallTracker.recordDraw(this.turn);
     const hand = this.playerHands[this.turn];
-    const card = this.drawFromPile();
+    const card = this.cardPiles.drawCard();
     if (card) {
       hand.add(card);
     }
