@@ -15,6 +15,8 @@ export interface RoundConfig {
   readonly cardsPerPlayer?: number;
 }
 
+export type RoundEndEvent = { readonly winner: number };
+
 // Plain, JSON-serialisable snapshot of a Round's entire state - every
 // hand (including opponents'), both piles, whose turn it is, and so on.
 // Anyone holding one of these can rebuild an equivalent Round without
@@ -48,6 +50,7 @@ export interface Round {
   canPlayAny(): boolean;
   play(cardIndex: number, color?: CardColor): Card;
   draw(): Card | undefined;
+  onEnd(callback: (event: RoundEndEvent) => void): void;
   toMemento(): RoundMemento;
 }
 
@@ -64,6 +67,7 @@ export class UnoRound implements Round {
   private playDirection: 1 | -1 = 1;
   private color: CardColor;
   private roundWinner: number | undefined = undefined;
+  private readonly endCallbacks: ((event: RoundEndEvent) => void)[] = [];
 
   // Pass a config to deal a fresh round, or a RoundMemento to restore
   // one exactly as it was saved (used by fromMemento / test adapters).
@@ -353,9 +357,14 @@ export class UnoRound implements Round {
 
     if (hand.size === 0) {
       this.roundWinner = player;
+      this.endCallbacks.forEach((callback) => callback({ winner: player }));
     }
 
     return card;
+  }
+
+  onEnd(callback: (event: RoundEndEvent) => void): void {
+    this.endCallbacks.push(callback);
   }
 
   draw(): Card | undefined {
