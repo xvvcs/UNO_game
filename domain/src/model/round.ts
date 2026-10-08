@@ -3,6 +3,7 @@ import { CARD_COLORS, cardPoints } from "./card.js";
 import { UnoDeck, type Deck } from "./deck.js";
 import { UnoPlayerHand, type PlayerHand } from "./playerHand.js";
 import { UnoCallTracker } from "./unoCallTracker.js";
+import { canCardBePlayed } from "./rules.js";
 import {
   standardRandomizer,
   standardShuffler,
@@ -298,19 +299,7 @@ export class UnoRound implements Round {
     const hand = this.playerHands[this.turn].cardsInHand;
     const card = hand[cardIndex];
     if (card === undefined) return false;
-
-    // A wild can always be played; a wild draw 4 only when no card matches the colour.
-    if (card.type === "WILD") return true;
-    if (card.type === "WILD DRAW") return !hand.some((c) => "color" in c && c.color === this.color);
-
-    if (card.color === this.color) return true;
-
-    const top = this.topCard();
-    if (card.type === "NUMBERED" && top.type === "NUMBERED") {
-      return card.number === top.number;
-    }
-    // Same special-card type (skip/reverse/draw) counts as a match too.
-    return card.type === top.type;
+    return canCardBePlayed(card, { hand, topCard: this.topCard(), currentColor: this.color });
   }
 
   canPlayAny(): boolean {
