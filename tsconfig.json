@@ -41,5 +41,6 @@
     "moduleDetection": "force",
     "skipLibCheck": true
   },
+  "include": ["domain/src"],
   "exclude": ["**/__test__/**"]
 }
