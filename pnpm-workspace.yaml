@@ -3,4 +3,5 @@ packages:
   - server
 
 allowBuilds:
+  '@apollo/protobufjs': false
   esbuild: false
