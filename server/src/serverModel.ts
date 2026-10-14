@@ -47,7 +47,7 @@ function seatOfPlayer(game: ActiveGame, playerName: string): number {
 
 function isAllowedToAct(game: ActiveGame, playerName: string, whoMayAct: WhoMayAct): boolean {
   const seat = seatOfPlayer(game, playerName)
-  if (seat === -1) return false
+  if (seat === -1 || game.round.hasEnded()) return false
   return whoMayAct === 'anyPlayer' || game.round.playerInTurn() === seat
 }
 
@@ -85,8 +85,8 @@ export class ServerModel {
     { cardIndex, color, sayUno }: PlayMove,
   ): Promise<MoveResponse> {
     return this.applyPlayerAction(id, playerName, 'playerInTurn', (round, seat) => {
-      if (sayUno) round.sayUno(seat)
       round.play(cardIndex, color)
+      if (sayUno && !round.hasEnded()) round.sayUno(seat)
     })
   }
 

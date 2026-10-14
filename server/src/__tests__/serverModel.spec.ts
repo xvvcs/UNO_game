@@ -100,6 +100,22 @@ describe('ServerModel', () => {
     })
   })
 
+  it('forbids saying UNO and catching an UNO failure once the round has ended', async () => {
+    await model.playCard('0', 'Alice', { cardIndex: 0, ...noColour })
+    await model.drawCard('0', 'Bob')
+    await model.playCard('0', 'Alice', { cardIndex: 0, color: 'BLUE', sayUno: false })
+
+    expect(await errorOf(await model.sayUno('0', 'Bob'))).toEqual({ type: 'Forbidden' })
+    expect(await errorOf(await model.catchUnoFailure('0', 'Bob', 0))).toEqual({ type: 'Forbidden' })
+  })
+
+  it('does not keep the UNO call of an illegal play', async () => {
+    await model.playCard('0', 'Alice', { cardIndex: 1, color: undefined, sayUno: true })
+    await model.playCard('0', 'Alice', { cardIndex: 0, ...noColour })
+    await model.catchUnoFailure('0', 'Bob', 0)
+    expect(game.round.playerHand(0)).toHaveLength(5)
+  })
+
   it('starts a game with the given players', async () => {
     await model.startGame('7', ['Ann', 'Ben', 'Cid'])
     const started = await (
