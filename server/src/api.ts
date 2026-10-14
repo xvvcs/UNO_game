@@ -5,16 +5,13 @@ import {
   type ActiveGame,
   type GameStore,
   type PlayMove,
-  type ServerError,
-  type StoreError,
+  type MoveResponse,
+  type StoreResponse,
 } from './serverModel.js'
 
 export interface Broadcaster {
   broadcastGame(game: ActiveGame): Promise<void>
 }
-
-type StoreResponse = ServerResponse<ActiveGame, StoreError>
-type MoveResponse = ServerResponse<ActiveGame, ServerError>
 
 export class GameApi {
   private readonly model: ServerModel

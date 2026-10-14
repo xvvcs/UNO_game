@@ -16,10 +16,14 @@ export type ServerError =
   | { readonly type: 'Forbidden' }
   | { readonly type: 'Illegal Move'; readonly reason: string }
 
+export type StoreResponse = ServerResponse<ActiveGame, StoreError>
+
+export type MoveResponse = ServerResponse<ActiveGame, ServerError>
+
 export interface GameStore {
-  findGame(id: string): Promise<ServerResponse<ActiveGame, StoreError>>
-  addGame(game: ActiveGame): Promise<ServerResponse<ActiveGame, StoreError>>
-  updateGame(game: ActiveGame): Promise<ServerResponse<ActiveGame, StoreError>>
+  findGame(id: string): Promise<StoreResponse>
+  addGame(game: ActiveGame): Promise<StoreResponse>
+  updateGame(game: ActiveGame): Promise<StoreResponse>
 }
 
 export type PlayMove = {
@@ -47,11 +51,7 @@ function isAllowedToAct(game: ActiveGame, playerName: string, whoMayAct: WhoMayA
   return whoMayAct === 'anyPlayer' || game.round.playerInTurn() === seat
 }
 
-function applyToRound(
-  game: ActiveGame,
-  seat: number,
-  action: RoundAction,
-): ServerResponse<ActiveGame, ServerError> {
+function applyToRound(game: ActiveGame, seat: number, action: RoundAction): MoveResponse {
   try {
     action(game.round, seat)
     return ServerResponse.success(game)
@@ -70,38 +70,39 @@ export class ServerModel {
     this.randomizer = randomizer
   }
 
-  findGame(id: string): Promise<ServerResponse<ActiveGame, StoreError>> {
+  findGame(id: string): Promise<StoreResponse> {
     return this.store.findGame(id)
   }
 
-  startGame(
-    id: string,
-    players: readonly string[],
-  ): Promise<ServerResponse<ActiveGame, StoreError>> {
+  startGame(id: string, players: readonly string[]): Promise<StoreResponse> {
     const round = new UnoRound({ players: [...players], dealer: this.randomizer(players.length) })
     return this.store.addGame({ id, pending: false, round })
   }
 
-  playCard(id: string, playerName: string, { cardIndex, color, sayUno }: PlayMove) {
+  playCard(
+    id: string,
+    playerName: string,
+    { cardIndex, color, sayUno }: PlayMove,
+  ): Promise<MoveResponse> {
     return this.applyPlayerAction(id, playerName, 'playerInTurn', (round, seat) => {
       if (sayUno) round.sayUno(seat)
       round.play(cardIndex, color)
     })
   }
 
-  drawCard(id: string, playerName: string) {
+  drawCard(id: string, playerName: string): Promise<MoveResponse> {
     return this.applyPlayerAction(id, playerName, 'playerInTurn', (round) => {
       round.draw()
     })
   }
 
-  sayUno(id: string, playerName: string) {
+  sayUno(id: string, playerName: string): Promise<MoveResponse> {
     return this.applyPlayerAction(id, playerName, 'anyPlayer', (round, seat) => {
       round.sayUno(seat)
     })
   }
 
-  catchUnoFailure(id: string, playerName: string, accused: number) {
+  catchUnoFailure(id: string, playerName: string, accused: number): Promise<MoveResponse> {
     return this.applyPlayerAction(id, playerName, 'anyPlayer', (round, seat) => {
       round.catchUnoFailure({ accuser: seat, accused })
     })
@@ -112,7 +113,7 @@ export class ServerModel {
     playerName: string,
     whoMayAct: WhoMayAct,
     action: RoundAction,
-  ): Promise<ServerResponse<ActiveGame, ServerError>> {
+  ): Promise<MoveResponse> {
     const found = await this.store.findGame(id)
     const allowed = await found.filter(
       async (game) => isAllowedToAct(game, playerName, whoMayAct),
