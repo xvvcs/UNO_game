@@ -1,5 +1,7 @@
+import { withFilter, type PubSub } from 'graphql-subscriptions'
 import type { GameApi } from './api.js'
 import { requirePlayerName, type GameContext } from './context.js'
+import { gameUpdatedEvent, isUpdateForPlayer, type GameUpdate } from './gameEvents.js'
 import {
   handOfPlayer,
   toGraphQLGameOrNull,
@@ -17,7 +19,7 @@ type NoParent = unknown
 
 type NoArguments = unknown
 
-export function createResolvers(api: GameApi) {
+export function createResolvers(pubsub: PubSub, api: GameApi) {
   return {
     Query: {
       async game(_: NoParent, args: unknown) {
@@ -60,6 +62,16 @@ export function createResolvers(api: GameApi) {
     ActiveGame: {
       hand(game: GraphQLActiveGame, _: NoArguments, context: GameContext) {
         return handOfPlayer(game, context.playerName)
+      },
+    },
+
+    Subscription: {
+      gameUpdated: {
+        subscribe: withFilter(
+          () => pubsub.asyncIterableIterator([gameUpdatedEvent]),
+          (update: GameUpdate | undefined, _: NoArguments, context: GameContext | undefined) =>
+            isUpdateForPlayer(update, context),
+        ),
       },
     },
   }

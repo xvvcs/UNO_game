@@ -1,4 +1,5 @@
 import { ApolloServer } from '@apollo/server'
+import { PubSub } from 'graphql-subscriptions'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { GameApi } from '../api.js'
 import type { GameContext } from '../context.js'
@@ -10,7 +11,7 @@ let server: ApolloServer<GameContext>
 
 beforeEach(async () => {
   const api = new GameApi({ async broadcastGame() {} }, new MemoryStore(seededGame()), () => 0)
-  server = new ApolloServer<GameContext>({ schema: await createGameSchema(api) })
+  server = new ApolloServer<GameContext>({ schema: await createGameSchema(new PubSub(), api) })
 })
 
 async function executeAs(playerName: string | undefined, query: string) {
