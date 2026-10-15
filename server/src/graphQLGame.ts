@@ -1,6 +1,14 @@
 import type { Card, CardColor } from '@domain/model/card.js'
 import { toGraphQLError } from './graphQLErrors.js'
-import type { ActiveGame, MoveResponse, StoreResponse } from './serverModel.js'
+import type { ServerResponse } from './response.js'
+import type {
+  ActiveGame,
+  Game,
+  LobbyResponse,
+  MoveResponse,
+  PendingGame,
+  StoreResponse,
+} from './serverModel.js'
 
 export type GraphQLActiveGame = {
   readonly id: string
@@ -16,6 +24,8 @@ export type GraphQLActiveGame = {
   readonly winner: number | null
   readonly score: number | null
 }
+
+export type GraphQLGame = GraphQLActiveGame | PendingGame
 
 export function toGraphQLGame({ id, round }: ActiveGame): GraphQLActiveGame {
   const memento = round.toMemento()
@@ -58,4 +68,27 @@ export function toGraphQLGameOrNull(response: StoreResponse): Promise<GraphQLAct
     onSuccess: async (game) => toGraphQLGame(game),
     onError: async () => null,
   })
+}
+
+export function toGraphQLAnyGame(game: Game): GraphQLGame {
+  return game.pending ? game : toGraphQLGame(game)
+}
+
+export function gameTypeName(game: GraphQLGame): 'ActiveGame' | 'PendingGame' {
+  return game.pending ? 'PendingGame' : 'ActiveGame'
+}
+
+export function valueOrThrow<Value>(response: LobbyResponse<Value>): Promise<Value> {
+  return response.resolve({
+    onSuccess: async (value) => value,
+    onError: async (error) => {
+      throw toGraphQLError(error)
+    },
+  })
+}
+
+export function valueOrNull<Value, Failure>(
+  response: ServerResponse<Value, Failure>,
+): Promise<Value | null> {
+  return response.resolve({ onSuccess: async (value) => value, onError: async () => null })
 }

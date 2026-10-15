@@ -6,6 +6,6 @@ export function createGraphQLError(message: string, code: string): GraphQLError 
 }
 
 export function toGraphQLError(error: ServerError): GraphQLError {
-  const message = error.type === 'Illegal Move' ? error.reason : error.type
+  const message = 'reason' in error ? error.reason : error.type
   return createGraphQLError(message, error.type)
 }
