@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router'
 import { CARD_COLORS, type Card, type CardColor } from '@domain/model/card'
 import { canCardBePlayed } from '@domain/model/rules'
 import { HUMAN, useGameStore } from '@/stores/game'
+import UnoCard from '@/components/UnoCard.vue'
 
 const store = useGameStore()
 const router = useRouter()
@@ -17,13 +18,6 @@ const view = computed(() => store.view)
 const opponents = computed(() =>
   (view.value?.playerNames ?? []).map((name, i) => ({ i, name })).filter(({ i }) => i !== HUMAN),
 )
-
-const label = (card: Card) =>
-  card.type === 'NUMBERED'
-    ? `${card.color} ${card.number}`
-    : 'color' in card
-      ? `${card.color} ${card.type}`
-      : card.type
 
 const playable = (card: Card) => store.isMyTurn && !!view.value && canCardBePlayed(card, view.value)
 
@@ -76,8 +70,11 @@ function leave() {
 
     <section>
       <p>
-        Top card: <strong>{{ label(view.topCard) }}</strong> · current color:
-        {{ view.currentColor }}
+        Top Card:
+      </p>
+      <UnoCard :card="view.topCard" isTopCard />
+      <p>
+        Current color: {{ view.currentColor }}
       </p>
       <p>Draw pile: {{ view.drawPileSize }} · direction: {{ view.direction }}</p>
       <p v-if="store.botsThinking && !store.isMyTurn">Bots are playing…</p>
@@ -86,15 +83,15 @@ function leave() {
 
     <section>
       <h2>Your hand <span v-if="store.isMyTurn">— your turn</span></h2>
-      <button
+      <div class="handContainer">
+        <UnoCard
         v-for="(card, i) in view.hand"
         :key="i"
-        :disabled="!playable(card)"
-        @click="clickCard(i, card)"
-      >
-        {{ label(card) }}
-      </button>
-
+        :card="card"
+        :playable="playable(card)"
+        @playCard="clickCard(i, card)"
+        />
+      </div>
       <div v-if="pendingWild !== undefined">
         Choose a color:
         <button v-for="c in CARD_COLORS" :key="c" @click="playCard(pendingWild, c)">{{ c }}</button>
@@ -113,3 +110,12 @@ function leave() {
     <RouterLink to="/">Set up a game</RouterLink>
   </main>
 </template>
+
+<style scoped>
+.handContainer{
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 1rem; 
+}
+</style>
