@@ -4,4 +4,17 @@
     --card-green: #379711;
     --card-yellow: #ecd407;
     --card-wildcard: #111111;
+    --uno-logo-red: #E3282E;
+    --uno-logo-yellow: #F5DA41;
+}
+
+html, body{
+    margin: 0;
+    min-height: 100vh;
+}
+
+body{
+    background: radial-gradient(circle, #0d472c 0%, #03190e 100%);
+    color: white;
+    font-family: system-ui, sans-serif;
 }
