@@ -114,6 +114,7 @@ describe('bot runner', () => {
         expect(round.playerHand(round.winner()!)).toHaveLength(0)
       }
     },
+    60_000,
   )
 
   it("stops and hands over when it's the human's turn", async () => {

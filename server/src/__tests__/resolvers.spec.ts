@@ -10,7 +10,13 @@ import { seededGame } from '../seededGame.js'
 let server: ApolloServer<GameContext>
 
 beforeEach(async () => {
-  const api = new GameApi({ async broadcastGame() {} }, new MemoryStore(seededGame()), () => 0)
+  let nextId = 1
+  const api = new GameApi(
+    { async broadcastGame() {}, async broadcastPendingGames() {} },
+    new MemoryStore(seededGame()),
+    () => 0,
+    () => `g${nextId++}`,
+  )
   server = new ApolloServer<GameContext>({ schema: await createGameSchema(new PubSub(), api) })
 })
 
@@ -118,5 +124,84 @@ describe('resolvers', () => {
       'mutation { catchUnoFailure(id: "0", accused: 0) { handSizes } }',
     )
     expect(result.data?.catchUnoFailure).toEqual({ handSizes: [5, 3] })
+  })
+
+  it('creates a game with the caller waiting in it', async () => {
+    const result = await executeAs(
+      'Ann',
+      'mutation { createGame(numberOfPlayers: 3) { id pending creator players numberOfPlayers } }',
+    )
+    expect(result.errors).toBeUndefined()
+    expect(result.data?.createGame).toEqual({
+      id: 'g1',
+      pending: true,
+      creator: 'Ann',
+      players: ['Ann'],
+      numberOfPlayers: 3,
+    })
+    const listed = await executeAs(undefined, '{ pendingGames { id players } }')
+    expect(listed.data?.pendingGames).toEqual([{ id: 'g1', players: ['Ann'] }])
+  })
+
+  it('rejects a game for fewer than 2 or more than 4 players', async () => {
+    for (const numberOfPlayers of [1, 5]) {
+      const result = await executeAs(
+        'Ann',
+        `mutation { createGame(numberOfPlayers: ${numberOfPlayers}) { id } }`,
+      )
+      expect(result.errors?.[0]?.extensions?.code).toBe('Bad Request')
+    }
+  })
+
+  const joinQuery = `mutation { joinGame(id: "g1") {
+    __typename
+    ... on PendingGame { players }
+    ... on ActiveGame { players hand { type } }
+  } }`
+
+  it('returns the pending game while seats are free and the active game once full', async () => {
+    await executeAs('Ann', 'mutation { createGame(numberOfPlayers: 3) { id } }')
+    const ben = await executeAs('Ben', joinQuery)
+    expect(ben.data?.joinGame).toEqual({ __typename: 'PendingGame', players: ['Ann', 'Ben'] })
+
+    const cid = await executeAs('Cid', joinQuery)
+    expect(cid.data?.joinGame).toMatchObject({
+      __typename: 'ActiveGame',
+      players: ['Ann', 'Ben', 'Cid'],
+    })
+    expect((cid.data?.joinGame as { hand: unknown[] }).hand).toHaveLength(7)
+    const pending = await executeAs('Ann', '{ pendingGame(id: "g1") { id } }')
+    expect(pending.data?.pendingGame).toBeNull()
+    const active = await executeAs('Ann', '{ game(id: "g1") { id } }')
+    expect(active.data?.game).toEqual({ id: 'g1' })
+  })
+
+  it('reports joining twice as a Conflict', async () => {
+    await executeAs('Ann', 'mutation { createGame(numberOfPlayers: 3) { id } }')
+    const result = await executeAs('Ann', joinQuery)
+    expect(result.errors?.[0]?.extensions?.code).toBe('Conflict')
+    expect(result.errors?.[0]?.message).toBe('Ann is already waiting for game g1')
+  })
+
+  it('lets only the creator start a game early', async () => {
+    await executeAs('Ann', 'mutation { createGame(numberOfPlayers: 4) { id } }')
+    await executeAs('Ben', joinQuery)
+    const byBen = await executeAs('Ben', 'mutation { startGame(id: "g1") { id } }')
+    expect(byBen.errors?.[0]?.extensions?.code).toBe('Forbidden')
+
+    const byAnn = await executeAs('Ann', 'mutation { startGame(id: "g1") { players } }')
+    expect(byAnn.data?.startGame).toEqual({ players: ['Ann', 'Ben'] })
+  })
+
+  it('lets a waiting player leave', async () => {
+    await executeAs('Ann', 'mutation { createGame(numberOfPlayers: 3) { id } }')
+    const result = await executeAs('Ann', 'mutation { leaveGame(id: "g1") }')
+    expect(result.data?.leaveGame).toBe('g1')
+    expect((await executeAs('Ann', '{ pendingGames { id } }')).data?.pendingGames).toEqual([])
+  })
+
+  it('forbids anonymous callers from creating games', async () => {
+    const result = await executeAs(undefined, 'mutation { createGame(numberOfPlayers: 2) { id } }')
+    expect(result.errors?.[0]?.extensions?.code).toBe('Forbidden')
   })
 })
