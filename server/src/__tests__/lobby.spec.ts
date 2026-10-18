@@ -1,7 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { MemoryStore } from '../memoryStore.js'
-import type { ServerResponse } from '../response.js'
-import { ServerModel, type ServerError } from '../serverModel.js'
+import { ServerResponse as Response, type ServerResponse } from '../response.js'
+import {
+  ServerModel,
+  type ActiveGame,
+  type ServerError,
+  type StoreResponse,
+} from '../serverModel.js'
 
 let model: ServerModel
 
@@ -112,5 +117,44 @@ describe('lobby', () => {
     const started = await valueOf(await model.startPendingGame('g1', 'Ann'))
     expect(started?.round.playerCount).toBe(2)
     expect(await model.pendingGames()).toEqual([])
+  })
+})
+
+describe('starting a game that fails', () => {
+  function modelWith(store: MemoryStore, randomizer: () => number) {
+    let nextId = 1
+    return new ServerModel(store, randomizer, () => `g${nextId++}`)
+  }
+
+  it('keeps the players waiting when the round cannot be dealt', async () => {
+    const failingDealer = () => {
+      throw new Error('no dealer')
+    }
+    const failing = modelWith(new MemoryStore(), failingDealer)
+    await failing.createGame('Ann', 2)
+
+    expect(await errorOf(await failing.joinGame('g1', 'Ben'))).toEqual({
+      type: 'Conflict',
+      reason: 'Could not start the game: no dealer',
+    })
+    // Ben's join failed, so he isn't seated - but Ann is still waiting instead of being lost
+    expect((await valueOf(await failing.findPendingGame('g1')))?.players).toEqual(['Ann'])
+    expect(await errorOf(await failing.findGame('g1'))).toMatchObject({ type: 'Not Found' })
+  })
+
+  it('keeps the players waiting when the game cannot be saved', async () => {
+    class BrokenStore extends MemoryStore {
+      override async addGame(game: ActiveGame): Promise<StoreResponse> {
+        return Response.failure({ type: 'Not Found', key: game.id })
+      }
+    }
+    const failing = modelWith(new BrokenStore(), () => 0)
+    await failing.createGame('Ann', 3)
+    await failing.joinGame('g1', 'Ben')
+
+    expect(await errorOf(await failing.startPendingGame('g1', 'Ann'))).toMatchObject({
+      type: 'Not Found',
+    })
+    expect((await valueOf(await failing.findPendingGame('g1')))?.players).toEqual(['Ann', 'Ben'])
   })
 })

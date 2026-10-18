@@ -170,9 +170,25 @@ export class ServerModel {
     return enoughPlayers.flatMap((game) => this.beginPendingGame(game))
   }
 
-  private async beginPendingGame(game: PendingGame): Promise<StoreResponse> {
-    await this.store.removePendingGame(game.id)
-    return this.startGame(game.id, game.players)
+  // Create and store the round first, and only then remove the waiting game.
+  // If anything fails the players are still in the waiting game and can try again.
+  private async beginPendingGame(game: PendingGame): Promise<MoveResponse> {
+    const round = this.dealRound(game.players)
+    const added = await round.flatMap((round) =>
+      this.store.addGame({ id: game.id, pending: false, round }),
+    )
+    await added.process(() => this.store.removePendingGame(game.id))
+    return added
+  }
+
+  private dealRound(players: readonly string[]): ServerResponse<Round, ServerError> {
+    try {
+      const dealer = this.randomizer(players.length)
+      return ServerResponse.success(new UnoRound({ players: [...players], dealer }))
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error)
+      return ServerResponse.failure(conflict(`Could not start the game: ${reason}`))
+    }
   }
 
   private async refuseIfWaiting(playerName: string): Promise<LobbyResponse<never> | undefined> {
