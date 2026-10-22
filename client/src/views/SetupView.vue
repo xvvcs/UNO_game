@@ -44,15 +44,16 @@ function start() {
   height: 100%;
 }
 #uno-logo {
-  width: min(200px, 60%);
+  width: min(15%);
   margin: 2% 0px 2% 0px;
 }
 .setupContainer {
+  width: 15%;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  background: rgba(20, 50, 38, 0.6); 
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  background: var(--background-tiles); 
+  border: 1px solid black;
   border-radius: 24px;
   padding: 1.5rem;
 }
@@ -60,19 +61,18 @@ function start() {
   display: block;
   margin: 10px 0 5px;
   color: white; 
-  font-size: 15px;
   font-weight: bold;
 }
 .nameInput{
   width: 90%;
   border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 2px solid black;
   padding: 13px;
   align-self: center;
-  background: rgba(255, 255, 255, 0.04);
-  color: white;
+  background: white;
+  color: black;
   font-weight: 700;
-  font-size: 15px;
+  font-size: 18px;
 }
 .bots { 
   display: flex; 
@@ -89,17 +89,16 @@ function start() {
   place-items: center;
   height: 50px;
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  background: rgba(255, 255, 255, 0.04);
-  color: #fff;
+  border: 2px solid black;
+  background: white;  
+  color: black;
   font-weight: 700;
-  font-size: 15px;
   cursor: pointer;
 }
 .bots input:checked + label {
   background: var(--uno-logo-yellow);
-  color: #13261d;
-  border-color: transparent;
+  color: black;
+  border: 2px solid white;
 }
 .startButton{
   width: 100%;
@@ -108,13 +107,16 @@ function start() {
   background-color: var(--uno-logo-red);
   color:white;
   font-weight: 700;
-  font-size: 15px;
   padding: 15px;
   cursor: pointer;
+  font-size: 18px;
 }
 .startButton:disabled{
   cursor: not-allowed;
   background-color: #5c3328;
-  color: rgba(255, 255, 255, 0.35);
+  color: rgba(255, 255, 255, 0.5);
+}
+.infoLabel{
+  text-align: center;
 }
 </style>

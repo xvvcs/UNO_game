@@ -1,0 +1,50 @@
+<script setup lang="ts">
+import type { CardColor } from '@domain/model/card'
+const props =defineProps<{currentColor?: CardColor, selectable?: boolean}>()
+const emit = defineEmits<{ selectColor: [CardColor] }>()
+const quarters: CardColor[] = ['YELLOW', 'RED', 'GREEN', 'BLUE']
+
+function selectColor(color: CardColor) {
+    if (props.selectable) emit('selectColor', color)
+}
+</script>
+
+<template>
+    <div class="colorWheel">
+        <div v-for="color in quarters" 
+            :key="color"
+            class="quarter" :class="[color.toLowerCase(), { active: selectable || color === currentColor, selectable }]"
+            @click="selectColor(color)"
+        ></div>
+    </div>
+</template>
+
+<style scoped>
+.colorWheel{
+    width: 8rem;
+    height: 8rem;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    border-radius: 50%;
+    overflow: hidden;          
+    border: 3px solid white;
+}
+.quarter{
+    filter: grayscale(0.5) brightness(0.5);
+    border: 1px solid white;
+}
+.quarter.active{
+    filter: grayscale(0) brightness(1);            
+}
+.quarter.red    { background: var(--card-red); }
+.quarter.blue   { background: var(--card-blue); }
+.quarter.green  { background: var(--card-green); }
+.quarter.yellow { background: var(--card-yellow); }
+.quarter.selectable { 
+    cursor: pointer; 
+}
+.quarter.selectable:hover { 
+    filter: brightness(1.5); 
+}
+</style>

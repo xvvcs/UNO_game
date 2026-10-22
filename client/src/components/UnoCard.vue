@@ -46,15 +46,12 @@ const emit = defineEmits<{ playCard: [] }>()
 .card.wild  { --card-color: var(--card-wildcard); }
 
 .card { 
-    width: 120px;
-    aspect-ratio: 2/3;
-    border-radius: 10px;
+    isolation: isolate;
+    width: 10rem;
     background: var(--card-color);
-    border: 4px solid white;
-    display: flex;
-    flex-direction: column;
+    border: 5px solid white;
     justify-content: space-between;
-    padding: 5px;
+    border-radius: 20px;
     cursor: default;
     transition: transform 0.15s, box-shadow 0.15s;
 }
@@ -63,11 +60,10 @@ const emit = defineEmits<{ playCard: [] }>()
 }
 .card.playable:hover {
      transform: translateY(-12px); 
-     box-shadow: 0 8px 16px rgb(0 0 0 / 0.35); 
+     box-shadow: 0 0 18px var(--card-yellow); 
 }
 .card.disabled {
-    opacity: 0.5;
-    filter: brightness(0.6); 
+    filter: brightness(0.5); 
 }
 .cardSymbolTopCorner {
     font-size: 2rem;
@@ -89,15 +85,8 @@ const emit = defineEmits<{ playCard: [] }>()
 }
 .ovalContainer{
     background: var(--card-color);
-    border-radius: 50%;
     border: 5px solid white;
-    width: 128%;
-    height: 50%;
     align-self: center;
-    transform: rotate(-50deg);
-    display: flex;
-    justify-content: center;
-    align-items: center;
 }
 .wildOvalContainer{
    background: conic-gradient(

@@ -6,6 +6,9 @@
     --card-wildcard: #111111;
     --uno-logo-red: #E3282E;
     --uno-logo-yellow: #F5DA41;
+    --background-gradient-start: #aa4040;
+    --background-gradient-end: #320606;
+    --background-tiles: rgb(0, 0, 0, 0.6);
 }
 
 html, body{
@@ -14,7 +17,32 @@ html, body{
 }
 
 body{
-    background: radial-gradient(circle, #0d472c 0%, #03190e 100%);
+    background: radial-gradient(circle, var(--background-gradient-start) 0%, var(--background-gradient-end) 100%);
     color: white;
-    font-family: system-ui, sans-serif;
+    font-family: Arial, sans-serif;
+    font-size: 18px;
+}
+.card{
+    isolation: isolate;
+    width: 2rem;
+    aspect-ratio: 2/3;
+    border-radius: 10px;
+    background: black;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 5px;
+}
+.ovalContainer{
+    background: var(--uno-logo-red);
+    border-radius: 50%;
+    width: 128%;
+    height: 50%;
+    transform: rotate(-50deg);
+    border: 2px solid white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: var(--uno-logo-yellow);
+    font-weight: 700;
 }
