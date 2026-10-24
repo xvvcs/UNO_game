@@ -1,6 +1,7 @@
 import { CARD_COLORS } from '@domain/model/card.js'
 import * as z from 'zod'
 import { createGraphQLError } from './graphQLErrors.js'
+import { maxPlayers, minPlayers } from './serverModel.js'
 
 export const GameIdArguments = z.object({ id: z.string().min(1) })
 
@@ -15,6 +16,10 @@ export const PlayCardArguments = GameIdArguments.extend({
 
 export const CatchUnoFailureArguments = GameIdArguments.extend({
   accused: z.number().int().nonnegative(),
+})
+
+export const CreateGameArguments = z.object({
+  numberOfPlayers: z.number().int().min(minPlayers).max(maxPlayers),
 })
 
 export function validateArguments<Output>(schema: z.ZodType<Output>, args: unknown): Output {

@@ -76,6 +76,20 @@ describe('game server', () => {
     expect(await Promise.race([eveEvent, nothingWithin(300)])).toBe('nothing')
   })
 
+  it('sends the lobby to every subscriber when a game is created', async () => {
+    const client = createClient({ url: server.webSocketUrl, webSocketImpl: WebSocket })
+    clients.push(client)
+    const events = client.iterate<{ pendingGamesUpdated: { creator: string }[] }>({
+      query: 'subscription { pendingGamesUpdated { creator } }',
+    })
+    const firstEvent = events.next()
+    await new Promise((resolve) => setTimeout(resolve, 50))
+
+    await postAs('Ann', 'mutation { createGame(numberOfPlayers: 2) { id } }')
+
+    expect((await firstEvent).value?.data).toEqual({ pendingGamesUpdated: [{ creator: 'Ann' }] })
+  })
+
   it('identifies HTTP callers by the player-name header', async () => {
     const anonymous = await postAs(undefined, 'mutation { drawCard(id: "0") { id } }')
     expect((await anonymous.json()).errors[0].extensions.code).toBe('Forbidden')
