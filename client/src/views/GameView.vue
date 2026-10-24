@@ -8,6 +8,7 @@ import UnoCard from '@/components/UnoCard.vue'
 import OpponentWidget from '@/components/OpponentWidget.vue'
 import ColorWheelWidget from '@/components/ColorWheelWidget.vue'
 import DrawPile from '@/components/DrawPile.vue'
+import UnoButton from '@/components/UnoButton.vue'
 
 const store = useGameStore()
 const router = useRouter()
@@ -21,8 +22,15 @@ const opponents = computed(() =>
   (view.value?.playerNames ?? []).map((name, i) => ({ i, name })).filter(({ i }) => i !== HUMAN),
 )
 const status = computed(() => {
-  if (message.value) return message.value
-  if (store.botsThinking && !store.isMyTurn) return 'Bots are playing…'
+  if(store.winner !== undefined){
+    return store.winner === HUMAN ? 'You won!' : `${view.value?.playerNames[store.winner]} won`
+  }
+  if (message.value){
+    return message.value
+  } 
+  if (store.botsThinking && !store.isMyTurn){
+    return 'Bots are playing…'
+  }
   return ''
 })
 
@@ -62,10 +70,6 @@ function leave() {
       <img id="uno-logo" src="@/assets/UNO_Logo.svg" alt="UNO Logo" />
       <span class="directionLabel">{{ view.direction === 'clockwise' ? '↻ Clockwise' : '↺ Counter-clockwise' }}</span>
     </section>
-    <section v-if="store.winner !== undefined">
-      <h2>{{ store.winner === HUMAN ? 'You won!' : `${view.playerNames[store.winner]} won` }}</h2>
-      <button @click="leave">New game</button>
-    </section>
 
     <section class="opponents">
       <OpponentWidget v-for="o in opponents" 
@@ -82,23 +86,34 @@ function leave() {
       <ColorWheelWidget class="colorWheelStatus" :currentColor="view.currentColor"/>
     </section>
     <section class="mainGameInfo">
-      <div class="mainGameInfoContainers">
-        <UnoCard :card="view.topCard" isTopCard />
-        <span>Top Card</span>
-      </div>
-      <div class="mainGameInfoContainers">
+       <div class="mainGameInfoContainers">
         <DrawPile 
         :isTurn="store.isMyTurn"
         @draw="store.draw()"
         />
         <span>Draw pile: {{ view.drawPileSize }}</span>
       </div>
+      <div class="mainGameInfoContainers">
+        <UnoCard :card="view.topCard" isTopCard />
+        <span>Top Card</span>
+      </div>
+      <div class="mainGameInfoContainers">
+        <UnoButton :sayUnoActive="sayUno" :isTurn="store.isMyTurn" @toggleBtn="sayUno = !sayUno" />
+        <span>Say Uno with this play</span>
+      </div>
     </section>
     <section class="statusInfo">
       <span>{{ status }}</span>
+      <button class="newGamebutton" v-if="store.winner !== undefined" @click="leave">New game</button>
     </section>
 
     <section class="handSection">
+      <span>Your hand <span v-if="store.isMyTurn">— your turn</span></span>
+      <Transition name="fade">
+        <div class="colorSelection" v-if="pendingWild !== undefined" @click.self="pendingWild = undefined">
+          <ColorWheelWidget selectable @selectColor="c => playCard(pendingWild!, c)" />
+        </div>
+      </Transition>
       <div class="handContainer">
         <UnoCard class="handCard"
         v-for="(card, i) in view.hand"
@@ -108,19 +123,15 @@ function leave() {
         @playCard="clickCard(i, card)"
         />
       </div>
-      <span>Your hand <span v-if="store.isMyTurn">— your turn</span></span>
-      <div class="colorSelection" v-if="pendingWild !== undefined">
-        <ColorWheelWidget selectable @selectColor="c => playCard(pendingWild!, c)" />
-      </div>
-
-      <p>
-        <label><input v-model="sayUno" type="checkbox" /> Say Uno with this play</label>
-      </p>
     </section>
   </main>
   <main v-else>
-    <p>No game in progress.</p>
-    <RouterLink to="/">Set up a game</RouterLink>
+    <section class="noGameSection">
+      <div class="noGameContainer">
+        <p>No game in progress.</p>
+        <RouterLink to="/">Set up a game</RouterLink>
+      </div>
+    </section>
   </main>
 </template>
 
@@ -152,12 +163,14 @@ function leave() {
 .handContainer{
   display: flex;
   flex-direction: row;
-  justify-content: center;
-  gap: 1rem; 
+  flex-wrap: wrap;  
+  justify-content: center; 
+  padding: 1rem 5rem 1rem 1rem;
   margin-bottom: 2rem;
+  row-gap: 1rem
 }
-.handContainer > * + * {
-  margin-left: -50px;         
+.handContainer > * {
+  margin-right: -4rem;       
 }
 .colorWheelStatus{
   width: 4rem;
@@ -176,8 +189,13 @@ function leave() {
   align-items: center;
   justify-content: center;
   min-height: 1.5rem;
-  margin-bottom: 1rem;
+  margin-top: 2rem;
+  margin-bottom: 2rem;
   font-weight: 700;
+}
+.statusInfo{
+  flex-direction: column;
+  gap: 1rem;
 }
 .mainGameInfo{
   display: flex;
@@ -192,7 +210,7 @@ function leave() {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
+  gap: 1em;
   font-weight: 700;
 }
 .handSection{
@@ -204,6 +222,56 @@ function leave() {
   font-weight: 700;
 }
 .colorSelection{
-  min-height: 4rem;
+  position: fixed;
+  inset: 0;                        
+  display: grid;
+  place-items: center;
+  background: rgb(0 0 0 / 0.80);
+  z-index: 10;
+}
+.fade-enter-active,
+.fade-leave-active{
+  transition: opacity 0.2s;
+}
+.fade-enter-from,
+.fade-leave-to{
+  opacity: 0;
+}
+
+.newGamebutton{
+  border-radius: 16px;
+  background-color: white;
+  border: 1px solid black;
+  color:black;
+  font-weight: 700;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-size: 18px;
+}
+.newGamebutton:hover{
+  background-color: var(--uno-logo-yellow);
+  border: 1px solid white;
+}
+.noGameContainer{
+  width: 15%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: var(--background-tiles); 
+  border: 1px solid black;
+  border-radius: 24px;
+  padding: 1.5rem;
+}
+.noGameSection{
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  height: 100%;
+  width: 100%;
+  margin-top: 20%;
 }
 </style>

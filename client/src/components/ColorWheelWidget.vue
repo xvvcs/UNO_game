@@ -21,8 +21,8 @@ function selectColor(color: CardColor) {
 
 <style scoped>
 .colorWheel{
-    width: 8rem;
-    height: 8rem;
+    width: 16rem;
+    height: 16rem;
     display: grid;
     grid-template-columns: 1fr 1fr;
     grid-template-rows: 1fr 1fr;
