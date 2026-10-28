@@ -9,32 +9,29 @@ import OpponentWidget from '@/components/OpponentWidget.vue'
 import ColorWheelWidget from '@/components/ColorWheelWidget.vue'
 import DrawPile from '@/components/DrawPile.vue'
 import UnoButton from '@/components/UnoButton.vue'
+import { useGameSource } from '@/game/gameSource'
 
-const store = useGameStore()
 const router = useRouter()
+const gameSource = useGameSource()
+const { view, mySeat, isMyTurn, winner } = gameSource
 
 const sayUno = ref(false)
 const pendingWild = ref<number>() // index of a wild card waiting for a colour choice
 const message = ref('')
 
-const view = computed(() => store.view)
 const opponents = computed(() =>
-  (view.value?.playerNames ?? []).map((name, i) => ({ i, name })).filter(({ i }) => i !== HUMAN),
+  (view.value?.playerNames ?? []).map((name, i) => ({ i, name })).filter(({ i }) => i !== mySeat.value),
 )
 const status = computed(() => {
-  if(store.winner !== undefined){
-    return store.winner === HUMAN ? 'You won!' : `${view.value?.playerNames[store.winner]} won`
+  if (winner.value !== undefined) {
+    return winner.value === mySeat.value ? 'You won!' : `${view.value?.playerNames[winner.value]} won`
   }
-  if (message.value){
-    return message.value
-  } 
-  if (store.botsThinking && !store.isMyTurn){
-    return 'Bots are playing…'
-  }
-  return ''
+  if (message.value) return message.value
+  if (gameSource.error.value) return gameSource.error.value
+  return gameSource.waitingText.value
 })
 
-const playable = (card: Card) => store.isMyTurn && !!view.value && canCardBePlayed(card, view.value)
+const playable = (card: Card) => isMyTurn.value && !!view.value && canCardBePlayed(card, view.value)
 
 async function clickCard(index: number, card: Card) {
   if (!playable(card)) return
@@ -50,15 +47,15 @@ async function playCard(index: number, color?: CardColor) {
   message.value = ''
   const uno = sayUno.value
   sayUno.value = false
-  await store.play(index, color, uno)
+  await gameSource.play(index, color, uno)
 }
 
-function accuse(i: number, name: string) {
-  message.value = store.accuse(i) ? `Caught ${name}! +4 cards.` : `${name} is safe.`
+async function accuse(i: number, name: string) {
+  message.value = (await gameSource.accuse(i)) ? `Caught ${name}! +4 cards.` : `${name} is safe.`
 }
 
 function leave() {
-  store.endRound()
+  gameSource.endLocalGame()
   router.push({ name: 'setup' })
 }
 </script>
@@ -88,8 +85,8 @@ function leave() {
     <section class="mainGameInfo">
        <div class="mainGameInfoContainers">
         <DrawPile 
-        :isTurn="store.isMyTurn"
-        @draw="store.draw()"
+        :isTurn="isMyTurn"
+        @draw="gameSource.draw()"
         />
         <span>Draw pile: {{ view.drawPileSize }}</span>
       </div>
@@ -98,17 +95,17 @@ function leave() {
         <span>Top Card</span>
       </div>
       <div class="mainGameInfoContainers">
-        <UnoButton :sayUnoActive="sayUno" :isTurn="store.isMyTurn" @toggleBtn="sayUno = !sayUno" />
+        <UnoButton :sayUnoActive="sayUno" :isTurn="isMyTurn" @toggleBtn="sayUno = !sayUno" />
         <span>Say Uno with this play</span>
       </div>
     </section>
     <section class="statusInfo">
       <span>{{ status }}</span>
-      <button class="newGamebutton" v-if="store.winner !== undefined" @click="leave">New game</button>
+      <button class="newGamebutton" v-if="winner !== undefined" @click="leave">New game</button>
     </section>
 
     <section class="handSection">
-      <span>Your hand <span v-if="store.isMyTurn">— your turn</span></span>
+      <span>Your hand <span v-if="isMyTurn">— your turn</span></span>
       <Transition name="fade">
         <div class="colorSelection" v-if="pendingWild !== undefined" @click.self="pendingWild = undefined">
           <ColorWheelWidget selectable @selectColor="c => playCard(pendingWild!, c)" />
