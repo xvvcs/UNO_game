@@ -22,7 +22,7 @@ const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 export function createBotRunner(
   round: Round,
   bots: ReadonlyMap<number, Bot>,
-  { thinkMs = 700, onChange = () => {} }: BotRunnerOptions = {},
+  { thinkMs = 2000, onChange = () => {} }: BotRunnerOptions = {},
 ): BotRunner {
   let disposed = false
   let running: Promise<void> | undefined
